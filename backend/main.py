@@ -270,7 +270,7 @@ def discover_jwks_sources(iss: str) -> list[dict]:
     add("Well-Known", f"{issuer}/.well-known/jwks.json")
     return sources
 
-def select_jwks_keys(jwks: dict, kid: str | None, alg: str) -> list[dict]:
+def select_jwks_keys(jwks: dict, kid: str | None) -> list[dict]:
     """Public verification keys from a key set, narrowed by kid when the token names one."""
     keys = jwks.get("keys")
     if not isinstance(keys, list):
@@ -560,6 +560,7 @@ async def verify_jwks(request: JWKSVerifyRequest):
 
     attempts = []
     resolved = None
+    keyset_found = None
 
     for source in sources:
         try:
@@ -571,7 +572,7 @@ async def verify_jwks(request: JWKSVerifyRequest):
                 assert_fetchable_url(jwks_uri)
                 document = await fetch_json(jwks_uri, timeout)
                 source = {**source, "url": jwks_uri}
-            keys = select_jwks_keys(document, key_id, algorithm)
+            keys = select_jwks_keys(document, key_id)
         except JWKSFetchError as e:
             attempts.append({"url": source["url"], "provider": source["provider"], "ok": False, "detail": str(e)})
             continue
@@ -583,11 +584,13 @@ async def verify_jwks(request: JWKSVerifyRequest):
             "url": source["url"], "provider": source["provider"], "ok": True,
             "detail": f"{len(document.get('keys') or [])} key(s) in set",
         })
+        if keyset_found is None:
+            keyset_found = {"source": source, "jwks": document}
         if keys:
             resolved = {"source": source, "jwks": document, "keys": keys}
             break
 
-    if not resolved:
+    if not resolved and not keyset_found:
         detail = "No reachable key set was found. " + " ".join(
             f"{a['provider']}: {a['detail']}" for a in attempts[-2:]
         )
@@ -595,6 +598,20 @@ async def verify_jwks(request: JWKSVerifyRequest):
             False, token_expired, "Key Set Unavailable",
             error=detail.strip(),
             algorithm=algorithm, key_id=key_id, attempts=attempts,
+        )
+
+    # A reachable set that was fetched but produced no candidate key
+    if not resolved:
+        source = keyset_found["source"]
+        return verify_result(
+            False, token_expired, "Key Not Found",
+            error=f"The token names kid='{key_id}' but no key in {source['url']} matches it "
+                  f"(use is 'sig'). The issuer may have rotated its keys — re-check the token or "
+                  "fetch the key by hand.",
+            algorithm=algorithm, key_id=key_id,
+            jwks_url=source["url"], jwks_provider=source["provider"],
+            keys_total=len(keyset_found["jwks"].get("keys") or []), keys_tried=0,
+            attempts=attempts,
         )
 
     source = resolved["source"]
@@ -617,18 +634,10 @@ async def verify_jwks(request: JWKSVerifyRequest):
             continue
 
     if not matched:
-        if key_id and not candidates:
-            message, detail = "Key Not Found", (
-                f"None of the keys in {source['url']} carries kid='{key_id}'. "
-                "The issuer may have rotated its keys — re-check the token or fetch the key by hand."
-            )
-        else:
-            message, detail = "Invalid Signature", (
-                f"Tried {tried} {expected_kty} key(s) from {source['url']}; none produced a valid "
-                f"{algorithm} signature. The token is unsigned by this issuer or has been tampered with."
-            )
         return verify_result(
-            False, token_expired, message, error=detail,
+            False, token_expired, "Invalid Signature",
+            error=f"Tried {tried} {expected_kty} key(s) from {source['url']}; none produced a valid "
+                  f"{algorithm} signature. The token is not signed by this issuer or has been tampered with.",
             algorithm=algorithm, key_id=key_id,
             jwks_url=source["url"], jwks_provider=source["provider"],
             keys_total=len(resolved["jwks"].get("keys") or []), keys_tried=tried,

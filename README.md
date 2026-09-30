@@ -67,6 +67,7 @@ App will be live at → http://localhost:5173
 - **Export PDF** — beautifully formatted PDF with header, payload, signature sections and branded design
 - **Sample token** — Load Sample button for quick demo
 - **Asymmetric verification** — verify RSA and ECDSA tokens with a PEM public key or JWK, not just HMAC secrets
+- **JWKS auto-resolution** — fetch the issuer's published key set and verify without pasting a key
 
 ---
 
@@ -91,6 +92,45 @@ Verification hardening:
 
 ---
 
+## JWKS Auto-Resolution
+
+`POST /verify-jwks` (UI: **Remote Key Resolution** panel) verifies an `RS*`/`ES*` token against the
+issuer's published key set, so no key material has to be pasted.
+
+Resolution order:
+
+1. An explicit `jwks_url`, if supplied — the manual override always wins.
+2. A provider template derived from the `iss` claim host/path: Auth0, Okta, Azure AD, Google,
+   Firebase, AWS Cognito, Keycloak, Apple.
+3. `/.well-known/openid-configuration`, from which `jwks_uri` is followed.
+4. `/.well-known/jwks.json`, on the origin and on the issuer path.
+
+Each endpoint that is tried is recorded in `attempts` and shown in the UI's *Discovery trace*, so a
+failure tells you which URL was consulted and why it was rejected.
+
+Response adds `jwks_url`, `jwks_provider`, `keys_total`, `keys_tried`, the sanitized `matched_key`,
+and `attempts`. Failure modes are distinct: `Key Set Unavailable` (nothing reachable),
+`Key Not Found` (set reached, no `kid` match), `Invalid Signature` (key matched, signature wrong),
+and `Issuer Unavailable` (no `iss` and no URL).
+
+The returned `matched_key` has private JWK members (`d`, `p`, `q`, `dp`, `dq`, `qi`, `oth`)
+stripped server-side, and can be fed straight into `/verify` as `public_key`.
+
+Because the URL is derived from an untrusted `iss` claim, fetches are SSRF-guarded:
+
+- `https` only; plain `http` is refused.
+- Credentials in the URL are refused.
+- Hostnames are resolved first, and loopback, private, link-local (cloud metadata),
+  reserved, multicast and unspecified addresses are refused. This catches DNS tricks such as
+  `127.0.0.1.nip.io` and IPv4-mapped IPv6 forms.
+- Every redirect hop is re-validated, with at most 3 hops.
+- Bodies are capped at 256 KB, with a bounded timeout.
+
+Set `JWT_ALLOW_PRIVATE_JWKS=1` to relax the scheme and address checks when developing against a
+key set on `localhost`. Never set it in a deployment.
+
+---
+
 ## API Endpoints
 
 | Method | Path          | Description                                       |
@@ -99,6 +139,7 @@ Verification hardening:
 | GET    | `/algorithms` | Algorithm catalog with families and key formats  |
 | POST   | `/decode`     | Decode a JWT token                                |
 | POST   | `/verify`     | Verify a signature (secret or public key)         |
+| POST   | `/verify-jwks`| Resolve the issuer's JWKS and verify against it   |
 | POST   | `/sign`       | Generate an HMAC-signed JWT (HS256/384/512)       |
 | POST   | `/export-pdf` | Generate PDF report                               |
 

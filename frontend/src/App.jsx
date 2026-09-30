@@ -3,6 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import DecoderPanel from "./components/DecoderPanel";
 import SectionCard from "./components/SectionCard";
 import VerifyPanel from "./components/VerifyPanel";
+import JWKSResolverPanel from "./components/JWKSResolverPanel";
+import AuditPanel from "./components/AuditPanel";
+import DiffPanel from "./components/DiffPanel";
 import GeneratorPanel from "./components/GeneratorPanel";
 import ErrorBoundary from "./components/ErrorBoundary";
 import SecurityScanner from "./components/SecurityScanner";
@@ -442,6 +445,11 @@ export default function App() {
   const [showSecret, setShowSecret] = useState(false);
   const [showPublicKey, setShowPublicKey] = useState(false);
 
+  // JWKS remote key resolution
+  const [jwksUrl, setJwksUrl] = useState("");
+  const [jwksResult, setJwksResult] = useState(null);
+  const [resolving, setResolving] = useState(false);
+
   // Generator
   const [genHeaderAlg, setGenHeaderAlg] = useState("HS256");
   const [genPayloadStr, setGenPayloadStr] = useState(JSON.stringify({
@@ -463,7 +471,7 @@ export default function App() {
   const decode = useCallback(async (t = token) => {
     const tk = t.trim();
     if (!tk) return;
-    setLoading(true); setError(""); setResult(null); setVerifyResult(null);
+    setLoading(true); setError(""); setResult(null); setVerifyResult(null); setJwksResult(null);
     try {
       const res = await fetch(`${API}/decode`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: tk }) });
       const data = await res.json();
@@ -505,6 +513,43 @@ export default function App() {
     return () => { mounted = false; clearTimeout(t); };
   }, [token, result, verifySecret, verifyPublicKey, verifyAlgorithm, addToast]);
 
+  // JWKS resolution (explicit, opt-in — never fires on paste)
+  const resolveJwks = useCallback(async () => {
+    const tk = token.trim();
+    if (!tk) return;
+    setResolving(true);
+    try {
+      const res = await fetch(`${API}/verify-jwks`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tk, jwks_url: jwksUrl.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "JWKS resolution failed");
+      setJwksResult(data);
+      addToast(
+        data.overall_valid
+          ? `Signature verified via ${data.jwks_provider} ✓`
+          : `JWKS resolution: ${data.message}`,
+        data.overall_valid ? "success" : "warning",
+      );
+    } catch (e) {
+      addToast(`JWKS error: ${e.message}`, "error");
+    } finally {
+      setResolving(false);
+    }
+  }, [token, jwksUrl, addToast]);
+
+  const useMatchedKey = useCallback(jwkJson => {
+    setVerifyPublicKey(jwkJson);
+    addToast("Public key loaded into Verify panel", "success");
+  }, [addToast]);
+
+  const clearJwks = useCallback(() => {
+    setJwksResult(null);
+    setJwksUrl("");
+  }, []);
+
   // Live token generation
   useEffect(() => {
     if (currentPath !== "/generate") return;
@@ -540,7 +585,7 @@ export default function App() {
   };
 
   const loadSample = () => { setToken(SAMPLE_JWT); decode(SAMPLE_JWT); };
-  const clear = () => { setToken(""); setResult(null); setError(""); setVerifyResult(null); addToast("Cleared", "info"); };
+  const clear = () => { setToken(""); setResult(null); setError(""); setVerifyResult(null); clearJwks(); addToast("Cleared", "info"); };
   const openInDecoder = (tok) => { setToken(tok); navigate("/decode"); decode(tok); addToast("Token loaded in decoder", "info"); };
   const resetAllStates = () => { clear(); setGenHeaderAlg("HS256"); setGenSecret("my-secret-key"); setGenExpiresIn("86400"); addToast("Reset complete", "success"); };
 
@@ -580,6 +625,8 @@ export default function App() {
           <div className="flex bg-secondary-custom border border-main p-1 rounded-xl gap-1">
             {[
               { path: "/decode", label: "Decoder", icon: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" },
+              { path: "/audit", label: "Audit", icon: "M9 12l2 2 4-4m5.6-2A10 10 0 112 12a10 10 0 0117.6-6z" },
+              { path: "/diff", label: "Diff", icon: "M8 7h13m0 0v13m0-13l-3 3m-3-3H3m0 0v13m0-13l3 3m-3 3h8a10 10 0 0110 10v-1" },
               { path: "/generate", label: "Generator", icon: "M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" },
             ].map(nav => (
               <button key={nav.path} onClick={() => navigate(nav.path)}
@@ -635,10 +682,59 @@ export default function App() {
                   />
 
                   <VerifyPanel verifyAlgorithm={verifyAlgorithm} setVerifyAlgorithm={setVerifyAlgorithm} verifySecret={verifySecret} setVerifySecret={setVerifySecret} verifyPublicKey={verifyPublicKey} setVerifyPublicKey={setVerifyPublicKey} verifyResult={verifyResult} showSecret={showSecret} setShowSecret={setShowSecret} showPublicKey={showPublicKey} setShowPublicKey={setShowPublicKey} />
+
+                  <JWKSResolverPanel token={token} header={result.header} payload={result.payload} jwksUrl={jwksUrl} setJwksUrl={setJwksUrl} jwksResult={jwksResult} resolving={resolving} resolve={resolveJwks} onUseMatchedKey={useMatchedKey} onClear={clearJwks} />
                 </ErrorBoundary>
               )}
             </div>
           </div>
+        )}
+
+        {/* Audit View */}
+        {currentPath === "/audit" && (
+          <ErrorBoundary onReset={resetAllStates}>
+            {!result ? (
+              <div className="glass-panel rounded-2xl p-10 text-center space-y-3 animate-fade-up">
+                <div className="text-main text-sm font-bold">Nothing to audit yet</div>
+                <div className="text-xs text-muted-custom">
+                  Decode a token first — the audit needs its header and claims.
+                </div>
+                <button
+                  onClick={loadSample}
+                  className="mt-2 px-5 py-2.5 rounded-xl btn-action-custom text-xs font-bold uppercase tracking-widest cursor-pointer"
+                >
+                  Load sample token
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-5">
+                <div className="px-5 py-3 rounded-2xl glass-panel flex items-center justify-between gap-4 animate-fade-up">
+                  <div>
+                    <div className="text-xs font-bold text-main font-mono-custom">
+                      {result.header?.alg} · {result.payload?.sub || "no subject"}
+                    </div>
+                    <div className="text-[10px] text-muted-custom font-mono-custom mt-0.5">
+                      {result.payload?.iss || "no issuer"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => navigate("/decode")}
+                    className="px-4 py-2 rounded-xl btn-secondary-custom text-xs font-bold uppercase tracking-widest transition-all cursor-pointer whitespace-nowrap"
+                  >
+                    Edit token
+                  </button>
+                </div>
+                <AuditPanel token={token} result={result} verifyPublicKey={verifyPublicKey} />
+              </div>
+            )}
+          </ErrorBoundary>
+        )}
+
+        {/* Diff View */}
+        {currentPath === "/diff" && (
+          <ErrorBoundary onReset={resetAllStates}>
+            <DiffPanel activeToken={result ? token : ""} />
+          </ErrorBoundary>
         )}
 
         {/* Generator View */}
