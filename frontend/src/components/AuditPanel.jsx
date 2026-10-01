@@ -73,10 +73,14 @@ export default function AuditPanel({ token, result, verifyPublicKey }) {
     return () => worker.terminate();
   }, []);
 
-  useEffect(() => {
+  // Reset results during render when the token changes. Doing this in an effect
+  // would set state synchronously and trigger a cascading render.
+  const [lastToken, setLastToken] = useState(token);
+  if (token !== lastToken) {
+    setLastToken(token);
     setCrackState({ status: "idle" });
     setProbe({ status: "idle", results: [] });
-  }, [token]);
+  }
 
   const startCrack = useCallback(() => {
     if (!workerRef.current || !token) return;
@@ -154,14 +158,6 @@ export default function AuditPanel({ token, result, verifyPublicKey }) {
     ...(payload ? {} : CLAIM_GUIDANCE[claim]),
     guidance: CLAIM_GUIDANCE[claim],
   }));
-
-  const crackTone = {
-    idle: "info",
-    running: "busy",
-    cracked: "critical",
-    exhausted: "pass",
-    error: "warning",
-  }[crackState.status];
 
   return (
     <div className="space-y-5">
