@@ -17,4 +17,5 @@ export const api = {
     call('/verify', { token, secret, algorithm, public_key }),
   sign:   (payload, secret, algorithm, expires_in) =>
     call('/sign', { payload, secret, algorithm, expires_in }),
+  decryptJwe: (token, key)            => call('/decrypt-jwe', { token, key }),
 }

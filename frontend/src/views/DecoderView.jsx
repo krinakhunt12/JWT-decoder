@@ -10,6 +10,7 @@ import JWKSResolverPanel from "../components/JWKSResolverPanel";
 import TimeBadge from "../components/TimeBadge";
 import LifecycleMonitor from "../components/LifecycleMonitor";
 import SnippetGeneratorModal from "../components/SnippetGeneratorModal";
+import JWEDecoderPanel from "../components/JWEDecoderPanel";
 import { isAsymmetric } from "../constants/algorithms";
 
 export default function DecoderView() {
@@ -28,6 +29,8 @@ export default function DecoderView() {
     removeHistoryItem,
     decode,
     loadSample,
+    loadSampleJwe,
+    loadSampleKeyForCurrentJwe,
     clear,
     exportPDF,
     verifyAlgorithm,
@@ -49,7 +52,16 @@ export default function DecoderView() {
     useMatchedKey,
     clearJwks,
     resetAllStates,
+    // JWE states
+    jweKey,
+    setJweKey,
+    decryptedJweData,
+    decryptingJwe,
+    decryptJweError,
+    decryptJwe,
   } = useJwtContext();
+
+  const isJwe = Boolean(result?.is_jwe);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 flex-1 items-start w-full">
@@ -68,6 +80,7 @@ export default function DecoderView() {
             setToken={setToken}
             decode={decode}
             loadSample={loadSample}
+            loadSampleJwe={loadSampleJwe}
             clear={clear}
             loading={loading}
             error={error}
@@ -89,7 +102,9 @@ export default function DecoderView() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-5 py-3 rounded-2xl glass-panel animate-fade-up">
               <div className="flex items-center gap-2 text-xs font-bold text-primary-color font-mono-custom">
                 <span className="w-2 h-2 rounded-full dot-indigo glow-pulse" />
-                Base64url decoded successfully
+                {isJwe
+                  ? "RFC 7516 JWE (Encrypted Token) Analyzed"
+                  : "Base64url decoded successfully"}
               </div>
 
               <div className="flex items-center gap-2 self-end sm:self-auto">
@@ -128,70 +143,86 @@ export default function DecoderView() {
               </div>
             </div>
 
-            {/* Feature 1: Live Expiry & Session Lifecycle Countdown Monitor */}
-            <LifecycleMonitor payload={result.payload} />
+            {/* If JWE: Render dedicated RFC 7516 JWE 5-Part Decoder Workbench */}
+            {isJwe ? (
+              <JWEDecoderPanel
+                result={result}
+                jweKey={jweKey}
+                setJweKey={setJweKey}
+                onDecrypt={decryptJwe}
+                decryptedData={decryptedJweData}
+                decrypting={decryptingJwe}
+                decryptError={decryptJweError}
+                onLoadSampleKey={loadSampleKeyForCurrentJwe}
+              />
+            ) : (
+              <>
+                {/* Feature 1: Live Expiry & Session Lifecycle Countdown Monitor */}
+                <LifecycleMonitor payload={result.payload} />
 
-            {/* Cryptographic & Security Scanner */}
-            <SecurityScanner
-              header={result.header}
-              payload={result.payload}
-              verifyResult={verifyResult}
-              verifySecret={isAsymmetric(verifyAlgorithm) ? "" : verifySecret}
-            />
+                {/* Cryptographic & Security Scanner */}
+                <SecurityScanner
+                  header={result.header}
+                  payload={result.payload}
+                  verifyResult={verifyResult}
+                  verifySecret={isAsymmetric(verifyAlgorithm) ? "" : verifySecret}
+                />
 
-            {/* Header Claims Card */}
-            <SectionCard
-              title="Header · Algorithm & Type"
-              badge="Header"
-              badgeColor="#e11d48"
-              data={result.header}
-            />
+                {/* Header Claims Card */}
+                <SectionCard
+                  title="Header · Algorithm & Type"
+                  badge="Header"
+                  badgeColor="#e11d48"
+                  data={result.header}
+                />
 
-            {/* Payload Claims Card */}
-            <SectionCard
-              title="Payload · Claims & Data"
-              badge="Payload"
-              badgeColor="#7c3aed"
-              data={result.payload}
-              extra={
-                Object.keys(result.time_fields || {}).length > 0 && (
-                  <div className="flex flex-col gap-2 w-full mt-3">
-                    {Object.keys(result.time_fields).map((k) => (
-                      <TimeBadge key={k} label={k} ts={result.payload[k]} />
-                    ))}
-                  </div>
-                )
-              }
-            />
+                {/* Payload Claims Card */}
+                <SectionCard
+                  title="Payload · Claims & Data"
+                  badge="Payload"
+                  badgeColor="#7c3aed"
+                  data={result.payload}
+                  extra={
+                    Object.keys(result.time_fields || {}).length > 0 && (
+                      <div className="flex flex-col gap-2 w-full mt-3">
+                        {Object.keys(result.time_fields).map((k) => (
+                          <TimeBadge key={k} label={k} ts={result.payload[k]} />
+                        ))}
+                      </div>
+                    )
+                  }
+                />
 
-            {/* Verification Panel */}
-            <VerifyPanel
-              verifyAlgorithm={verifyAlgorithm}
-              setVerifyAlgorithm={setVerifyAlgorithm}
-              verifySecret={verifySecret}
-              setVerifySecret={setVerifySecret}
-              verifyPublicKey={verifyPublicKey}
-              setVerifyPublicKey={setVerifyPublicKey}
-              verifyResult={verifyResult}
-              showSecret={showSecret}
-              setShowSecret={setShowSecret}
-              showPublicKey={showPublicKey}
-              setShowPublicKey={setShowPublicKey}
-            />
+                {/* Verification Panel */}
+                <VerifyPanel
+                  verifyAlgorithm={verifyAlgorithm}
+                  setVerifyAlgorithm={setVerifyAlgorithm}
+                  verifySecret={verifySecret}
+                  setVerifySecret={setVerifySecret}
+                  verifyPublicKey={verifyPublicKey}
+                  setVerifyPublicKey={setVerifyPublicKey}
+                  verifyResult={verifyResult}
+                  showSecret={showSecret}
+                  setShowSecret={setShowSecret}
+                  showPublicKey={showPublicKey}
+                  setShowPublicKey={setShowPublicKey}
+                />
 
-            {/* JWKS Remote Key Resolver */}
-            <JWKSResolverPanel
-              token={token}
-              header={result.header}
-              payload={result.payload}
-              jwksUrl={jwksUrl}
-              setJwksUrl={setJwksUrl}
-              jwksResult={jwksResult}
-              resolving={resolving}
-              resolve={resolveJwks}
-              onUseMatchedKey={useMatchedKey}
-              onClear={clearJwks}
-            />
+                {/* JWKS Remote Key Resolver */}
+                <JWKSResolverPanel
+                  token={token}
+                  header={result.header}
+                  payload={result.payload}
+                  jwksUrl={jwksUrl}
+                  setJwksUrl={setJwksUrl}
+                  jwksResult={jwksResult}
+                  resolving={resolving}
+                  resolve={resolveJwks}
+                  onUseMatchedKey={useMatchedKey}
+                  onClear={clearJwks}
+                />
+              </>
+            )}
           </ErrorBoundary>
         )}
       </div>

@@ -1,5 +1,13 @@
 import { createContext, useContext, useState, useCallback, useEffect } from "react";
 import { isAsymmetric, SUPPORTED_ALGORITHMS } from "../constants/algorithms";
+import {
+  isJweToken,
+  decodeJweHeader,
+  decryptJweInBrowser,
+  SAMPLE_JWE_DIRECT,
+  SAMPLE_JWE_RSA,
+} from "../utils/jwe";
+import { decodeToken } from "../utils/jwt";
 
 const API = "http://localhost:8000";
 
@@ -26,6 +34,12 @@ export function JwtProvider({ children }) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+
+  // JWE (JSON Web Encryption — RFC 7516) states
+  const [jweKey, setJweKey] = useState("");
+  const [decryptedJweData, setDecryptedJweData] = useState(null);
+  const [decryptingJwe, setDecryptingJwe] = useState(false);
+  const [decryptJweError, setDecryptJweError] = useState("");
 
   // History
   const [history, setHistory] = useState(() => {
@@ -98,20 +112,19 @@ export function JwtProvider({ children }) {
         role: "senior_developer",
         tenant: "codesmiths",
         scopes: ["profile:read", "code:write", "apis:manage"],
-        iat: Math.floor(Date.now() / 1000),
       },
       null,
       2
     )
   );
   const [genSecret, setGenSecret] = useState("my-secret-key");
-  const [genExpiresIn, setGenExpiresIn] = useState("86400");
+  const [genExpiresIn, setGenExpiresIn] = useState("3600");
   const [generatedToken, setGeneratedToken] = useState("");
   const [genResult, setGenResult] = useState(null);
   const [genError, setGenError] = useState("");
   const [showGenSecret, setShowGenSecret] = useState(false);
 
-  // Decode operation
+  // Decode operation (supporting both RFC 7519 JWS and RFC 7516 JWE)
   const decode = useCallback(
     async (t = token) => {
       const tk = (t || "").trim();
@@ -121,6 +134,66 @@ export function JwtProvider({ children }) {
       setResult(null);
       setVerifyResult(null);
       setJwksResult(null);
+      setDecryptedJweData(null);
+      setDecryptJweError("");
+
+      const parts = tk.split(".");
+
+      // ─── 1. RFC 7516 JWE (5-part Encrypted Token) Handling ───
+      if (parts.length === 5) {
+        const headerInfo = decodeJweHeader(tk);
+        if (headerInfo) {
+          // Pre-populate matching sample key if user loaded a demo token
+          if (tk === SAMPLE_JWE_DIRECT.token) {
+            setJweKey(SAMPLE_JWE_DIRECT.key);
+          } else if (tk === SAMPLE_JWE_RSA.token) {
+            setJweKey(SAMPLE_JWE_RSA.key);
+          }
+
+          const jweData = {
+            is_jwe: true,
+            token_type: "JWE",
+            header: headerInfo.header,
+            payload: {
+              _jwe_status: "Encrypted",
+              _standard: "RFC 7516 JSON Web Encryption",
+              alg: headerInfo.alg,
+              enc: headerInfo.enc,
+              zip: headerInfo.zip,
+              message: `Ciphertext payload is encrypted with ${headerInfo.enc || "AEAD"}. Enter decryption key below to inspect decrypted claims.`,
+            },
+            signature: parts[4], // Authentication Tag
+            algorithm: headerInfo.alg,
+            encryption: headerInfo.enc,
+            key_id: headerInfo.kid,
+            time_fields: {},
+            raw_parts: {
+              header: parts[0],
+              encrypted_key: parts[1],
+              iv: parts[2],
+              ciphertext: parts[3],
+              tag: parts[4],
+            },
+            jwe_meta: {
+              alg: headerInfo.alg,
+              enc: headerInfo.enc,
+              zip: headerInfo.zip,
+              kid: headerInfo.kid,
+              algMeta: headerInfo.algMeta,
+              encMeta: headerInfo.encMeta,
+              lengths: headerInfo.lengths,
+            },
+          };
+
+          setResult(jweData);
+          addToast("RFC 7516 JWE (Encrypted Token) detected ✓", "info");
+          saveToHistory(tk, headerInfo.header, { sub: `JWE [${headerInfo.alg} · ${headerInfo.enc}]` });
+          setLoading(false);
+          return;
+        }
+      }
+
+      // ─── 2. RFC 7519 JWS (3-part Signed Token) Handling ───
       try {
         const res = await fetch(`${API}/decode`, {
           method: "POST",
@@ -136,14 +209,121 @@ export function JwtProvider({ children }) {
           setVerifyAlgorithm(data.header.alg);
         }
       } catch (e) {
-        setError(e.message);
-        addToast(`Decode error: ${e.message}`, "error");
+        // High-resilience client-side decode fallback
+        const clientParsed = decodeToken(tk);
+        if (clientParsed) {
+          const clientData = {
+            is_jwe: false,
+            token_type: "JWS",
+            header: clientParsed.header,
+            payload: clientParsed.payload,
+            signature: clientParsed.signature,
+            time_fields: {},
+            algorithm: clientParsed.header?.alg,
+            algorithm_supported: SUPPORTED_ALGORITHMS.includes(clientParsed.header?.alg),
+            key_id: clientParsed.header?.kid,
+            raw_parts: {
+              header: clientParsed.header,
+              payload: clientParsed.payload,
+              signature: clientParsed.signature,
+            },
+          };
+          setResult(clientData);
+          addToast("JWT decoded client-side ✓", "success");
+          saveToHistory(tk, clientParsed.header, clientParsed.payload);
+          if (clientParsed.header?.alg && SUPPORTED_ALGORITHMS.includes(clientParsed.header.alg)) {
+            setVerifyAlgorithm(clientParsed.header.alg);
+          }
+        } else {
+          setError(e.message);
+          addToast(`Decode error: ${e.message}`, "error");
+        }
       } finally {
         setLoading(false);
       }
     },
     [token, addToast, saveToHistory]
   );
+
+  // ─── JWE Decryption Action (Client-side WebCrypto with backend fallback) ───
+  const decryptJwe = useCallback(
+    async (customKey = jweKey) => {
+      const k = (customKey || "").trim();
+      const tk = token.trim();
+      if (!tk || !k) {
+        setDecryptJweError("Please provide a decryption key (AES secret or RSA Private Key).");
+        return;
+      }
+
+      setDecryptingJwe(true);
+      setDecryptJweError("");
+
+      // Attempt 1: In-browser WebCrypto decryption (100% private, zero server persistence)
+      try {
+        const clientDecrypted = await decryptJweInBrowser(tk, k);
+        setDecryptedJweData(clientDecrypted);
+        addToast("JWE decrypted & authenticated via WebCrypto ✓", "success");
+
+        // Merge decrypted payload so bi-temporal lifecycle monitor and claim trees activate
+        if (clientDecrypted.payload && typeof clientDecrypted.payload === "object") {
+          setResult((prev) => (prev ? { ...prev, payload: clientDecrypted.payload } : prev));
+        }
+        setDecryptingJwe(false);
+        return;
+      } catch (browserErr) {
+        console.warn("Client WebCrypto decryption notice, testing backend engine:", browserErr.message);
+      }
+
+      // Attempt 2: Backend python-jose decryption fallback
+      try {
+        const res = await fetch(`${API}/decrypt-jwe`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: tk, key: k }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) {
+          throw new Error(data.error || data.detail || "Decryption failed");
+        }
+        setDecryptedJweData({ payload: data.payload, raw: data.raw_decrypted, isJson: data.is_json });
+        addToast("JWE decrypted & authenticated via cryptographic engine ✓", "success");
+        if (data.payload && typeof data.payload === "object") {
+          setResult((prev) => (prev ? { ...prev, payload: data.payload, time_fields: data.time_fields || {} } : prev));
+        }
+      } catch (backendErr) {
+        setDecryptJweError(backendErr.message);
+        addToast(`Decryption failed: ${backendErr.message}`, "error");
+      } finally {
+        setDecryptingJwe(false);
+      }
+    },
+    [token, jweKey, addToast]
+  );
+
+  const loadSampleJwe = useCallback(
+    (type = "direct") => {
+      const sample = type === "rsa" ? SAMPLE_JWE_RSA : SAMPLE_JWE_DIRECT;
+      setToken(sample.token);
+      setJweKey(sample.key);
+      decode(sample.token);
+      addToast(`Loaded ${sample.name} ✨`, "success");
+    },
+    [decode, addToast]
+  );
+
+  const loadSampleKeyForCurrentJwe = useCallback(() => {
+    const tk = token.trim();
+    if (tk === SAMPLE_JWE_DIRECT.token) {
+      setJweKey(SAMPLE_JWE_DIRECT.key);
+      addToast("Loaded matching AES-256 demo key ✓", "info");
+    } else if (tk === SAMPLE_JWE_RSA.token) {
+      setJweKey(SAMPLE_JWE_RSA.key);
+      addToast("Loaded matching RSA Private Key PEM ✓", "info");
+    } else {
+      setJweKey(SAMPLE_JWE_DIRECT.key);
+      addToast("Loaded demo key format", "info");
+    }
+  }, [token, addToast]);
 
   const loadHistoryItem = useCallback(
     (tok) => {
@@ -154,8 +334,10 @@ export function JwtProvider({ children }) {
     [decode, addToast]
   );
 
-  // Auto-verify signature when token, result, or credentials change
+  // Auto-verify signature for standard JWS tokens
   useEffect(() => {
+    if (result?.is_jwe) return; // JWE does not use JWS signature verification
+
     const needsPublicKey = isAsymmetric(verifyAlgorithm);
     const keyMissing = needsPublicKey ? !verifyPublicKey.trim() : !verifySecret;
     if (!result || !token || keyMissing) {
@@ -224,25 +406,36 @@ export function JwtProvider({ children }) {
   }, [token, jwksUrl, addToast]);
 
   const useMatchedKey = useCallback(
-    (jwkJson) => {
-      setVerifyPublicKey(jwkJson);
-      addToast("Public key loaded into Verify panel", "success");
+    (pem) => {
+      if (!pem) return;
+      setVerifyPublicKey(pem);
+      if (jwksResult?.algorithm) {
+        setVerifyAlgorithm(jwksResult.algorithm);
+      }
+      addToast("Public key imported from JWKS into verification panel ✓", "success");
     },
-    [addToast]
+    [jwksResult, addToast]
   );
 
   const clearJwks = useCallback(() => {
-    setJwksResult(null);
     setJwksUrl("");
+    setJwksResult(null);
   }, []);
 
-  // Live token generation
+  // Live Token Generator effect
   useEffect(() => {
     let mounted = true;
     const generate = async () => {
+      setGenError("");
       try {
-        const parsed = JSON.parse(genPayloadStr);
-        setGenError("");
+        let parsed;
+        try {
+          parsed = JSON.parse(genPayloadStr);
+        } catch {
+          if (mounted) setGenError("Invalid JSON in payload");
+          return;
+        }
+
         const res = await fetch(`${API}/sign`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -313,6 +506,9 @@ export function JwtProvider({ children }) {
     setResult(null);
     setError("");
     setVerifyResult(null);
+    setJweKey("");
+    setDecryptedJweData(null);
+    setDecryptJweError("");
     clearJwks();
     addToast("Cleared", "info");
   }, [clearJwks, addToast]);
@@ -327,7 +523,7 @@ export function JwtProvider({ children }) {
     [decode, addToast]
   );
 
-  // Complete reset of all states (fixes the undefined resetAllStates crash)
+  // Complete reset of all states
   const resetAllStates = useCallback(() => {
     setToken("");
     setResult(null);
@@ -347,6 +543,10 @@ export function JwtProvider({ children }) {
     setGeneratedToken("");
     setGenResult(null);
     setGenError("");
+    setJweKey("");
+    setDecryptedJweData(null);
+    setDecryptingJwe(false);
+    setDecryptJweError("");
     addToast("All application states successfully reset", "info");
   }, [addToast]);
 
@@ -359,20 +559,18 @@ export function JwtProvider({ children }) {
     result,
     setResult,
     error,
-    setError,
     loading,
     exporting,
     history,
-    saveToHistory,
     loadHistoryItem,
-    removeHistoryItem,
     clearHistory,
+    removeHistoryItem,
+    verifyAlgorithm,
+    setVerifyAlgorithm,
     verifySecret,
     setVerifySecret,
     verifyPublicKey,
     setVerifyPublicKey,
-    verifyAlgorithm,
-    setVerifyAlgorithm,
     verifyResult,
     verifying,
     showSecret,
@@ -405,6 +603,15 @@ export function JwtProvider({ children }) {
     openInDecoder,
     exportPDF,
     resetAllStates,
+    // JWE additions
+    jweKey,
+    setJweKey,
+    decryptedJweData,
+    decryptingJwe,
+    decryptJweError,
+    decryptJwe,
+    loadSampleJwe,
+    loadSampleKeyForCurrentJwe,
   };
 
   return <JwtContext.Provider value={value}>{children}</JwtContext.Provider>;

@@ -16,6 +16,7 @@ import hashlib
 import httpx
 from jose import jws as jose_jws
 from jose import jwt as jose_jwt
+from jose import jwe as jose_jwe
 from jose.exceptions import ExpiredSignatureError, JWKError, JWSError, JWTClaimsError, JWTError
 
 from reportlab.lib.pagesizes import A4
@@ -62,6 +63,10 @@ ALGORITHM_METADATA = {
 
 class JWTRequest(BaseModel):
     token: str
+
+class JWEDecryptRequest(BaseModel):
+    token: str
+    key: str
 
 class PDFRequest(BaseModel):
     token: str
@@ -317,8 +322,59 @@ def decode_jwt(request: JWTRequest):
     token = request.token.strip()
     parts = token.split(".")
 
+    # ── RFC 7516: JWE (JSON Web Encryption — 5 Parts) ──
+    if len(parts) == 5:
+        try:
+            header = decode_base64_part(parts[0])
+            if not isinstance(header, dict):
+                raise HTTPException(status_code=400, detail="Invalid JWE header")
+
+            alg = header.get("alg")
+            enc = header.get("enc")
+            zip_algo = header.get("zip")
+
+            return {
+                "is_jwe": True,
+                "token_type": "JWE",
+                "header": header,
+                "payload": {
+                    "_jwe_status": "Encrypted",
+                    "_standard": "RFC 7516 JSON Web Encryption",
+                    "alg": alg,
+                    "enc": enc,
+                    "zip": zip_algo,
+                    "message": f"Payload is securely encrypted using {enc or 'AEAD'}. Enter decryption key to view decrypted claims."
+                },
+                "signature": parts[4],  # Authentication Tag
+                "algorithm": alg,
+                "encryption": enc,
+                "key_id": header.get("kid"),
+                "time_fields": {},
+                "raw_parts": {
+                    "header": parts[0],
+                    "encrypted_key": parts[1],
+                    "iv": parts[2],
+                    "ciphertext": parts[3],
+                    "tag": parts[4]
+                },
+                "jwe_meta": {
+                    "alg": alg,
+                    "enc": enc,
+                    "zip": zip_algo,
+                    "kid": header.get("kid"),
+                    "encrypted_key_bytes": len(parts[1]),
+                    "iv_bytes": len(parts[2]),
+                    "ciphertext_bytes": len(parts[3]),
+                    "tag_bytes": len(parts[4]),
+                }
+            }
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to decode JWE: {str(e)}")
+
     if len(parts) != 3:
-        raise HTTPException(status_code=400, detail="Invalid JWT: must have 3 parts separated by dots")
+        raise HTTPException(status_code=400, detail="Invalid JWT: must have 3 parts (JWS) or 5 parts (JWE) separated by dots")
 
     try:
         header = decode_base64_part(parts[0])
@@ -339,6 +395,8 @@ def decode_jwt(request: JWTRequest):
                     time_fields[key] = human
 
         return {
+            "is_jwe": False,
+            "token_type": "JWS",
             "header": header,
             "payload": payload,
             "signature": signature,
@@ -356,6 +414,60 @@ def decode_jwt(request: JWTRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to decode JWT: {str(e)}")
+
+
+@app.post("/decrypt-jwe")
+def decrypt_jwe(request: JWEDecryptRequest):
+    token = request.token.strip()
+    key_str = request.key.strip()
+    parts = token.split(".")
+    if len(parts) != 5:
+        raise HTTPException(status_code=400, detail="Invalid JWE: must have 5 parts separated by dots")
+
+    if not key_str:
+        raise HTTPException(status_code=400, detail="Decryption key is required")
+
+    try:
+        header = decode_base64_part(parts[0])
+        alg = header.get("alg", "")
+        enc = header.get("enc", "")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JWE header: {e}")
+
+    try:
+        decrypted_bytes = jose_jwe.decrypt(token, key_str)
+        text = decrypted_bytes.decode("utf-8")
+        try:
+            payload = json.loads(text)
+            is_json = True
+        except Exception:
+            payload = {"raw_text": text}
+            is_json = False
+
+        time_fields = {}
+        if isinstance(payload, dict):
+            for k in ["iat", "exp", "nbf"]:
+                if k in payload:
+                    human = format_timestamp(payload[k])
+                    if human:
+                        time_fields[k] = human
+
+        return {
+            "success": True,
+            "header": header,
+            "payload": payload,
+            "raw_decrypted": text,
+            "is_json": is_json,
+            "time_fields": time_fields,
+            "alg": alg,
+            "enc": enc,
+            "message": f"Successfully decrypted {enc} payload with authenticated integrity tag ✓"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Decryption failed: {str(e)}. Ensure the key matches algorithm {alg}."
+        }
 
 
 @app.post("/verify")
