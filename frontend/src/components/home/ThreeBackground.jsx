@@ -8,169 +8,99 @@ export default function ThreeBackground() {
     const container = mountRef.current;
     if (!container) return;
 
-    // ─── 1. Scene & Camera Setup ───
+    // ─── 1. Scene & Camera Setup (Full Viewport Coverage) ───
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(
       52,
-      container.clientWidth / container.clientHeight,
+      window.innerWidth / window.innerHeight,
       0.1,
       1000
     );
-    camera.position.set(0, 0, 36);
+    camera.position.set(0, 0, 38);
 
     const renderer = new THREE.WebGLRenderer({
       alpha: true,
       antialias: true,
       powerPreference: "high-performance",
     });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     container.appendChild(renderer.domElement);
 
-    // ─── Curated Light Purple / Lavender Palette ───
-    // Soft, luminous, elegant on crisp white background
+    // ─── Curated Monochromatic Light Purple / Lavender Palette ───
     const PURPLE_BRIGHT = 0xc084fc; // Lilac / Purple-400
-    const PURPLE_SOFT = 0xd8b4fe; // Soft Lavender / Purple-300
-    const PURPLE_MAIN = 0xa855f7; // Pure Light Purple / Purple-500
-    const PURPLE_PALE = 0xe9d5ff; // Whisper Violet / Purple-200
-    const PURPLE_DEEP = 0x9333ea; // Royal Accent / Purple-600
+    const PURPLE_SOFT   = 0xd8b4fe; // Soft Lavender / Purple-300
+    const PURPLE_MAIN   = 0xa855f7; // Light Purple / Purple-500
+    const PURPLE_PALE   = 0xe9d5ff; // Whisper Violet / Purple-200
+    const PURPLE_MUTED  = 0x7e22ce; // Deep Soft Accent
 
-    // ─── 2. Gyroscopic Cryptographic JWT Rings (Light Purple) ───
-    const gyroGroup = new THREE.Group();
-    scene.add(gyroGroup);
+    // ─── STAGE 1 (Top / Hero): Gyroscopic JWT Token Rings ───
+    const heroGyroGroup = new THREE.Group();
+    scene.add(heroGyroGroup);
 
-    // Ring 1: Outer Header Token Ring
-    const ring1Geo = new THREE.TorusGeometry(12.5, 0.12, 16, 90);
-    const ring1Mat = new THREE.MeshBasicMaterial({
-      color: PURPLE_BRIGHT,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.28,
-    });
-    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
-    ring1.rotation.x = Math.PI / 3;
-    gyroGroup.add(ring1);
+    // Header Ring
+    const r1Geo = new THREE.TorusGeometry(12, 0.12, 16, 80);
+    const r1Mat = new THREE.MeshBasicMaterial({ color: PURPLE_BRIGHT, wireframe: true, transparent: true, opacity: 0.28 });
+    const r1 = new THREE.Mesh(r1Geo, r1Mat);
+    r1.rotation.x = Math.PI / 3;
+    heroGyroGroup.add(r1);
 
-    // Ring 2: Middle Claims Payload Ring
-    const ring2Geo = new THREE.TorusGeometry(9.8, 0.1, 16, 80);
-    const ring2Mat = new THREE.MeshBasicMaterial({
-      color: PURPLE_SOFT,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.32,
-    });
-    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
-    ring2.rotation.y = Math.PI / 4;
-    ring2.rotation.x = -Math.PI / 6;
-    gyroGroup.add(ring2);
+    // Payload Ring
+    const r2Geo = new THREE.TorusGeometry(9.4, 0.1, 16, 70);
+    const r2Mat = new THREE.MeshBasicMaterial({ color: PURPLE_SOFT, wireframe: true, transparent: true, opacity: 0.32 });
+    const r2 = new THREE.Mesh(r2Geo, r2Mat);
+    r2.rotation.y = Math.PI / 4;
+    r2.rotation.x = -Math.PI / 6;
+    heroGyroGroup.add(r2);
 
-    // Ring 3: Inner Signature Verification Ring
-    const ring3Geo = new THREE.TorusGeometry(7.2, 0.08, 16, 70);
-    const ring3Mat = new THREE.MeshBasicMaterial({
-      color: PURPLE_MAIN,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.35,
-    });
-    const ring3 = new THREE.Mesh(ring3Geo, ring3Mat);
-    ring3.rotation.z = Math.PI / 5;
-    gyroGroup.add(ring3);
+    // Signature Ring
+    const r3Geo = new THREE.TorusGeometry(6.8, 0.08, 16, 60);
+    const r3Mat = new THREE.MeshBasicMaterial({ color: PURPLE_MAIN, wireframe: true, transparent: true, opacity: 0.35 });
+    const r3 = new THREE.Mesh(r3Geo, r3Mat);
+    r3.rotation.z = Math.PI / 5;
+    heroGyroGroup.add(r3);
 
-    // Ring 4: Delicate Outer Equator Halo
-    const haloGeo = new THREE.TorusGeometry(14.5, 0.03, 16, 100);
-    const haloMat = new THREE.MeshBasicMaterial({
-      color: PURPLE_PALE,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.18,
-    });
+    // Outer Equator Halo
+    const haloGeo = new THREE.TorusGeometry(14, 0.03, 16, 90);
+    const haloMat = new THREE.MeshBasicMaterial({ color: PURPLE_PALE, wireframe: true, transparent: true, opacity: 0.18 });
     const halo = new THREE.Mesh(haloGeo, haloMat);
-    gyroGroup.add(halo);
+    heroGyroGroup.add(halo);
 
-    // Central Key Diamond Core (Nested Octahedron & Icosahedron)
-    const coreGeo = new THREE.OctahedronGeometry(3.2, 0);
-    const coreMat = new THREE.MeshBasicMaterial({
-      color: PURPLE_MAIN,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.32,
-    });
+    // Central Verification Octahedron Key
+    const coreGeo = new THREE.OctahedronGeometry(3.0, 0);
+    const coreMat = new THREE.MeshBasicMaterial({ color: PURPLE_MAIN, wireframe: true, transparent: true, opacity: 0.35 });
     const coreMesh = new THREE.Mesh(coreGeo, coreMat);
-    gyroGroup.add(coreMesh);
+    heroGyroGroup.add(coreMesh);
 
-    const innerCoreGeo = new THREE.IcosahedronGeometry(1.8, 0);
-    const innerCoreMat = new THREE.MeshBasicMaterial({
-      color: PURPLE_SOFT,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.28,
-    });
-    const innerCore = new THREE.Mesh(innerCoreGeo, innerCoreMat);
-    gyroGroup.add(innerCore);
+    // Inner Luminous Core Sphere
+    const innerGlowGeo = new THREE.SphereGeometry(1.2, 16, 16);
+    const innerGlowMat = new THREE.MeshBasicMaterial({ color: PURPLE_BRIGHT, transparent: true, opacity: 0.16 });
+    const innerGlow = new THREE.Mesh(innerGlowGeo, innerGlowMat);
+    heroGyroGroup.add(innerGlow);
 
-    // Soft Ambient Light Pulse Core
-    const glowGeo = new THREE.SphereGeometry(1.0, 16, 16);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: PURPLE_BRIGHT,
-      transparent: true,
-      opacity: 0.16,
-    });
-    const glowMesh = new THREE.Mesh(glowGeo, glowMat);
-    gyroGroup.add(glowMesh);
-
-    // Position Gyro Ring group in upper-right visual anchor
-    gyroGroup.position.set(13, 3, -4);
-
-    // Light Purple Orbital Satellites revolving along rings
+    // Satellites
     const satellites = [
-      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_BRIGHT, transparent: true, opacity: 0.75 })), radius: 12.5, speed: 0.9, offset: 0, axis: 'x' },
-      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.25, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_SOFT, transparent: true, opacity: 0.7 })), radius: 9.8, speed: -1.2, offset: Math.PI / 2, axis: 'y' },
-      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_PALE, transparent: true, opacity: 0.8 })), radius: 7.2, speed: 1.5, offset: Math.PI, axis: 'z' },
+      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.3, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_BRIGHT, transparent: true, opacity: 0.75 })), radius: 12, speed: 0.8, offset: 0 },
+      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_SOFT, transparent: true, opacity: 0.7 })), radius: 9.4, speed: -1.1, offset: Math.PI / 2 },
+      { mesh: new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 12), new THREE.MeshBasicMaterial({ color: PURPLE_PALE, transparent: true, opacity: 0.8 })), radius: 6.8, speed: 1.4, offset: Math.PI },
     ];
-    satellites.forEach(s => gyroGroup.add(s.mesh));
+    satellites.forEach(s => heroGyroGroup.add(s.mesh));
 
-    // ─── 3. Undulating Light Purple Quantum Wave Ribbons ───
-    const waveRibbonsGroup = new THREE.Group();
-    scene.add(waveRibbonsGroup);
+    heroGyroGroup.position.set(13, 4, -4);
 
-    const ribbonCurves = [];
-    const ribbonCount = 3;
-    const ribbonPointsCount = 60;
-
-    for (let r = 0; r < ribbonCount; r++) {
-      const geo = new THREE.BufferGeometry();
-      const pos = new Float32Array(ribbonPointsCount * 3);
-      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
-
-      const mat = new THREE.LineBasicMaterial({
-        color: r === 0 ? PURPLE_BRIGHT : r === 1 ? PURPLE_SOFT : PURPLE_PALE,
-        transparent: true,
-        opacity: 0.22 - r * 0.04,
-      });
-
-      const line = new THREE.Line(geo, mat);
-      waveRibbonsGroup.add(line);
-      ribbonCurves.push({
-        line,
-        geo,
-        yBase: -10 + r * 3,
-        zBase: -10 + r * 2,
-        freq: 0.12 + r * 0.04,
-        speed: 0.8 + r * 0.3,
-      });
-    }
-
-    // ─── 4. Floating Light Purple Cryptographic Shards (Data Crystals) ───
+    // ─── STAGE 2 (Upper-Middle / Algorithms & Threat Intel): Floating Crystal Shards ───
     const shardGroup = new THREE.Group();
     scene.add(shardGroup);
 
     const shardConfigs = [
-      { geo: new THREE.OctahedronGeometry(1.6, 0), x: -18, y: 12, z: -8, speed: 0.9 },
-      { geo: new THREE.TetrahedronGeometry(1.5, 0), x: -22, y: -6, z: -10, speed: 1.1 },
-      { geo: new THREE.DodecahedronGeometry(1.4, 0), x: -10, y: -16, z: -6, speed: 0.8 },
-      { geo: new THREE.IcosahedronGeometry(1.3, 0), x: 19, y: -14, z: -12, speed: 1.2 },
-      { geo: new THREE.OctahedronGeometry(1.7, 0), x: 23, y: 16, z: -14, speed: 0.7 },
-      { geo: new THREE.TetrahedronGeometry(1.4, 0), x: -6, y: 18, z: -9, speed: 1.0 },
+      { geo: new THREE.OctahedronGeometry(1.8, 0), x: -19, y: 14, z: -8, speed: 0.9 },
+      { geo: new THREE.TetrahedronGeometry(1.6, 0), x: -24, y: -4, z: -10, speed: 1.1 },
+      { geo: new THREE.DodecahedronGeometry(1.5, 0), x: -14, y: -16, z: -7, speed: 0.8 },
+      { geo: new THREE.IcosahedronGeometry(1.4, 0), x: 21, y: -12, z: -12, speed: 1.2 },
+      { geo: new THREE.OctahedronGeometry(1.9, 0), x: 25, y: 16, z: -14, speed: 0.7 },
+      { geo: new THREE.TetrahedronGeometry(1.5, 0), x: -8, y: 22, z: -9, speed: 1.0 },
+      { geo: new THREE.DodecahedronGeometry(1.6, 0), x: 18, y: -26, z: -8, speed: 0.85 },
+      { geo: new THREE.OctahedronGeometry(1.5, 0), x: -20, y: -30, z: -11, speed: 1.15 },
     ];
 
     const shards = shardConfigs.map((cfg, idx) => {
@@ -178,34 +108,66 @@ export default function ThreeBackground() {
         color: idx % 2 === 0 ? PURPLE_BRIGHT : PURPLE_SOFT,
         wireframe: true,
         transparent: true,
-        opacity: 0.22,
+        opacity: 0.24,
       });
       const mesh = new THREE.Mesh(cfg.geo, mat);
       mesh.position.set(cfg.x, cfg.y, cfg.z);
       shardGroup.add(mesh);
       return {
         mesh,
-        rotSpeedX: 0.008 + idx * 0.002,
-        rotSpeedY: 0.012 + idx * 0.003,
+        rotSpeedX: 0.007 + idx * 0.002,
+        rotSpeedY: 0.01 + idx * 0.002,
         baseY: cfg.y,
         floatSpeed: cfg.speed,
       };
     });
 
-    // ─── 5. Luminous Light Purple Particle Matrix (Whisper Constellation) ───
-    const particleCount = 75;
+    // ─── STAGE 3 (Middle / Claims Dictionary & Workflow): Undulating Light Purple Wave Ribbons ───
+    const waveRibbonsGroup = new THREE.Group();
+    scene.add(waveRibbonsGroup);
+
+    const ribbonCurves = [];
+    const ribbonCount = 4;
+    const ribbonPointsCount = 64;
+
+    for (let r = 0; r < ribbonCount; r++) {
+      const geo = new THREE.BufferGeometry();
+      const pos = new Float32Array(ribbonPointsCount * 3);
+      geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+
+      const mat = new THREE.LineBasicMaterial({
+        color: r % 2 === 0 ? PURPLE_BRIGHT : PURPLE_SOFT,
+        transparent: true,
+        opacity: 0.22 - r * 0.035,
+      });
+
+      const line = new THREE.Line(geo, mat);
+      waveRibbonsGroup.add(line);
+      ribbonCurves.push({
+        line,
+        geo,
+        yBase: -12 + r * 5,
+        zBase: -8 + r * 2.5,
+        freq: 0.1 + r * 0.03,
+        speed: 0.7 + r * 0.25,
+      });
+    }
+
+    // ─── STAGE 4 (Whole Page / Global): Luminous Stardust Constellation with Connective Threads ───
+    const particleCount = 100;
     const particleGeo = new THREE.BufferGeometry();
     const pPositions = new Float32Array(particleCount * 3);
     const pVelocities = [];
 
+    // Distribute particles across a wide 3D vertical volume spanning the full viewport
     for (let i = 0; i < particleCount; i++) {
-      pPositions[i * 3] = (Math.random() - 0.5) * 62;
-      pPositions[i * 3 + 1] = (Math.random() - 0.5) * 46;
-      pPositions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+      pPositions[i * 3] = (Math.random() - 0.5) * 68;
+      pPositions[i * 3 + 1] = (Math.random() - 0.5) * 58;
+      pPositions[i * 3 + 2] = (Math.random() - 0.5) * 32;
 
       pVelocities.push({
-        x: (Math.random() - 0.5) * 0.018,
-        y: (Math.random() - 0.5) * 0.018,
+        x: (Math.random() - 0.5) * 0.016,
+        y: (Math.random() - 0.5) * 0.016,
         z: (Math.random() - 0.5) * 0.012,
       });
     }
@@ -221,48 +183,63 @@ export default function ThreeBackground() {
     scene.add(pSystem);
 
     // Delicate translucent purple connective lines
-    const maxLines = 180;
+    const maxLines = 220;
     const linePos = new Float32Array(maxLines * 6);
     const lineGeo = new THREE.BufferGeometry();
     lineGeo.setAttribute("position", new THREE.BufferAttribute(linePos, 3));
     const lineMat = new THREE.LineBasicMaterial({
       color: PURPLE_PALE,
       transparent: true,
-      opacity: 0.20,
+      opacity: 0.18,
     });
     const lineMesh = new THREE.LineSegments(lineGeo, lineMat);
     scene.add(lineMesh);
 
-    // ─── 6. Smooth Mouse Parallax & Scroll Glide ───
+    // ─── STAGE 5 (Bottom / CTA & FAQ): Secondary Luminous Horizon Ring ───
+    const bottomRingGeo = new THREE.TorusGeometry(18, 0.08, 16, 100);
+    const bottomRingMat = new THREE.MeshBasicMaterial({
+      color: PURPLE_SOFT,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.22,
+    });
+    const bottomRing = new THREE.Mesh(bottomRingGeo, bottomRingMat);
+    bottomRing.position.set(-10, -28, -10);
+    bottomRing.rotation.x = Math.PI / 3.5;
+    scene.add(bottomRing);
+
+    // ─── Mouse Movement & Full-Page Scroll Tracking ───
     let mouseX = 0;
     let mouseY = 0;
     let targetX = 0;
     let targetY = 0;
     let scrollY = 0;
+    let scrollProgress = 0;
 
     const onMouseMove = (e) => {
       const halfX = window.innerWidth / 2;
       const halfY = window.innerHeight / 2;
-      mouseX = (e.clientX - halfX) * 0.0008;
-      mouseY = (e.clientY - halfY) * 0.0008;
+      mouseX = (e.clientX - halfX) * 0.0007;
+      mouseY = (e.clientY - halfY) * 0.0007;
     };
 
     const onScroll = () => {
       scrollY = window.scrollY;
+      const maxScroll = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+      scrollProgress = Math.min(1, Math.max(0, scrollY / maxScroll));
     };
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     window.addEventListener("scroll", onScroll, { passive: true });
 
     const onResize = () => {
-      if (!container) return;
-      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setSize(window.innerWidth, window.innerHeight);
     };
     window.addEventListener("resize", onResize);
 
-    // ─── 7. Main Animation Loop ───
+    // ─── 60 FPS Render Loop (Continuous Whole-Page Flow) ───
     let animationFrameId;
     const clock = new THREE.Clock();
 
@@ -274,16 +251,20 @@ export default function ThreeBackground() {
       targetX += (mouseX - targetX) * 0.05;
       targetY += (mouseY - targetY) * 0.05;
 
-      // 1. Gyroscopic Rings Rotation
-      ring1.rotation.z = time * 0.22 + scrollY * 0.0004;
-      ring2.rotation.x = time * -0.28 + targetY * 1.2;
-      ring3.rotation.y = time * 0.32 + targetX * 1.2;
-      halo.rotation.z = time * -0.15;
+      // 1. Gyroscope Rings Rotation with scroll influence
+      r1.rotation.z = time * 0.22 + scrollY * 0.0004;
+      r2.rotation.x = time * -0.26 + targetY * 1.2;
+      r3.rotation.y = time * 0.3 + targetX * 1.2;
+      halo.rotation.z = time * -0.14;
 
-      gyroGroup.rotation.y = time * 0.09 + targetX * 1.5;
-      gyroGroup.rotation.x = time * 0.06 + targetY * 1.0;
+      heroGyroGroup.rotation.y = time * 0.08 + targetX * 1.4;
+      heroGyroGroup.rotation.x = time * 0.05 + targetY * 1.0;
 
-      // Satellite revolutions
+      // Gyro group glides vertically as user scrolls down the page
+      heroGyroGroup.position.y = 4 - scrollProgress * 14;
+      heroGyroGroup.position.x = 13 - scrollProgress * 6;
+
+      // Satellites
       satellites[0].mesh.position.set(
         Math.cos(time * satellites[0].speed + satellites[0].offset) * satellites[0].radius,
         Math.sin(time * satellites[0].speed + satellites[0].offset) * satellites[0].radius,
@@ -303,20 +284,17 @@ export default function ThreeBackground() {
       // Core Diamond Pulsing
       coreMesh.rotation.x = time * 0.45;
       coreMesh.rotation.y = time * 0.55;
-      innerCore.rotation.x = -time * 0.6;
-      innerCore.rotation.z = time * 0.4;
-
       const breathe = 1 + Math.sin(time * 2.2) * 0.07;
       coreMesh.scale.set(breathe, breathe, breathe);
-      glowMesh.scale.set(breathe * 1.2, breathe * 1.2, breathe * 1.2);
+      innerGlow.scale.set(breathe * 1.25, breathe * 1.25, breathe * 1.25);
 
-      // 2. Animate Undulating Purple Wave Ribbons
+      // 2. Animate Wave Ribbons
       ribbonCurves.forEach((r, rIdx) => {
         const positions = r.geo.attributes.position.array;
         for (let i = 0; i < ribbonPointsCount; i++) {
-          const x = (i - ribbonPointsCount / 2) * 1.2;
-          const y = r.yBase + Math.sin(x * r.freq + time * r.speed + rIdx) * 2.4;
-          const z = r.zBase + Math.cos(x * r.freq * 0.8 + time * (r.speed * 0.7)) * 1.8;
+          const x = (i - ribbonPointsCount / 2) * 1.3;
+          const y = r.yBase + Math.sin(x * r.freq + time * r.speed + rIdx) * 2.2;
+          const z = r.zBase + Math.cos(x * r.freq * 0.8 + time * (r.speed * 0.7)) * 1.6;
 
           positions[i * 3] = x;
           positions[i * 3 + 1] = y;
@@ -325,22 +303,26 @@ export default function ThreeBackground() {
         r.geo.attributes.position.needsUpdate = true;
       });
 
-      // 3. Floating Light Purple Shards
+      // 3. Floating Shards Tumble
       shards.forEach((s, idx) => {
         s.mesh.rotation.x += s.rotSpeedX;
         s.mesh.rotation.y += s.rotSpeedY;
-        s.mesh.position.y = s.baseY + Math.sin(time * s.floatSpeed + idx) * 1.2;
+        s.mesh.position.y = s.baseY + Math.sin(time * s.floatSpeed + idx) * 1.4;
       });
 
-      // 4. Ambient Particle Network Drift
+      // 4. Bottom Horizon Ring Rotation
+      bottomRing.rotation.z = time * 0.16 + scrollY * 0.0003;
+      bottomRing.rotation.y = Math.PI / 6 + targetX * 1.0;
+
+      // 5. Ambient Stardust Drift throughout the whole scene
       const pos = particleGeo.attributes.position.array;
       for (let i = 0; i < particleCount; i++) {
         pos[i * 3] += pVelocities[i].x;
         pos[i * 3 + 1] += pVelocities[i].y;
         pos[i * 3 + 2] += pVelocities[i].z;
 
-        if (Math.abs(pos[i * 3]) > 32) pVelocities[i].x *= -1;
-        if (Math.abs(pos[i * 3 + 1]) > 24) pVelocities[i].y *= -1;
+        if (Math.abs(pos[i * 3]) > 34) pVelocities[i].x *= -1;
+        if (Math.abs(pos[i * 3 + 1]) > 29) pVelocities[i].y *= -1;
         if (Math.abs(pos[i * 3 + 2]) > 16) pVelocities[i].z *= -1;
       }
       particleGeo.attributes.position.needsUpdate = true;
@@ -354,7 +336,7 @@ export default function ThreeBackground() {
           const dz = pos[i * 3 + 2] - pos[j * 3 + 2];
           const distSq = dx * dx + dy * dy + dz * dz;
 
-          if (distSq < 105 && lineIdx < maxLines) {
+          if (distSq < 100 && lineIdx < maxLines) {
             linePos[lineIdx * 6] = pos[i * 3];
             linePos[lineIdx * 6 + 1] = pos[i * 3 + 1];
             linePos[lineIdx * 6 + 2] = pos[i * 3 + 2];
@@ -369,17 +351,18 @@ export default function ThreeBackground() {
       lineGeo.setDrawRange(0, lineIdx * 2);
       lineGeo.attributes.position.needsUpdate = true;
 
-      // Camera parallax tilt with subtle scroll elevation
-      camera.position.x = targetX * 4.5;
-      camera.position.y = -targetY * 4.5 + Math.min(scrollY * 0.005, 8);
-      camera.lookAt(0, 0, 0);
+      // 6. Camera Glides Dynamically Down the Whole Page on Scroll
+      // Camera moves gracefully along the Y axis following scrollProgress
+      camera.position.x = targetX * 4.0;
+      camera.position.y = -targetY * 4.0 - scrollProgress * 16;
+      camera.lookAt(0, -scrollProgress * 16, 0);
 
       renderer.render(scene, camera);
     };
 
     animate();
 
-    // ─── 8. Comprehensive GPU Cleanup ───
+    // ─── Resource Cleanup ───
     return () => {
       cancelAnimationFrame(animationFrameId);
       window.removeEventListener("mousemove", onMouseMove);
@@ -390,30 +373,29 @@ export default function ThreeBackground() {
         container.removeChild(renderer.domElement);
       }
 
-      // Dispose Geometries & Materials
-      ring1Geo.dispose();
-      ring1Mat.dispose();
-      ring2Geo.dispose();
-      ring2Mat.dispose();
-      ring3Geo.dispose();
-      ring3Mat.dispose();
+      r1Geo.dispose();
+      r1Mat.dispose();
+      r2Geo.dispose();
+      r2Mat.dispose();
+      r3Geo.dispose();
+      r3Mat.dispose();
       haloGeo.dispose();
       haloMat.dispose();
       coreGeo.dispose();
       coreMat.dispose();
-      innerCoreGeo.dispose();
-      innerCoreMat.dispose();
-      glowGeo.dispose();
-      glowMat.dispose();
+      innerGlowGeo.dispose();
+      innerGlowMat.dispose();
+      bottomRingGeo.dispose();
+      bottomRingMat.dispose();
       particleGeo.dispose();
       pMat.dispose();
       lineGeo.dispose();
       lineMat.dispose();
-      ribbonCurves.forEach(r => {
+      ribbonCurves.forEach((r) => {
         r.geo.dispose();
         r.line.material.dispose();
       });
-      shards.forEach(s => {
+      shards.forEach((s) => {
         s.mesh.geometry.dispose();
         s.mesh.material.dispose();
       });
@@ -424,10 +406,10 @@ export default function ThreeBackground() {
   return (
     <div
       ref={mountRef}
-      className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
+      className="fixed inset-0 pointer-events-none z-0 overflow-hidden"
       style={{
-        maskImage: "radial-gradient(ellipse at 50% 35%, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 85%)",
-        WebkitMaskImage: "radial-gradient(ellipse at 50% 35%, rgba(0,0,0,1) 45%, rgba(0,0,0,0) 85%)",
+        maskImage: "radial-gradient(ellipse at 50% 50%, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
+        WebkitMaskImage: "radial-gradient(ellipse at 50% 50%, rgba(0,0,0,1) 60%, rgba(0,0,0,0) 95%)",
       }}
     />
   );
