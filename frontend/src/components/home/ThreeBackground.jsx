@@ -369,8 +369,12 @@ export default function ThreeBackground() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onResize);
 
-      if (container && renderer.domElement) {
-        container.removeChild(renderer.domElement);
+      if (container && renderer.domElement && container.contains(renderer.domElement)) {
+        try {
+          container.removeChild(renderer.domElement);
+        } catch {
+          // already unmounted
+        }
       }
 
       r1Geo.dispose();

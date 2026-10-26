@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navbar({ loadSample }) {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ export default function Navbar({ loadSample }) {
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-white/75 border-b border-main shadow-xs transition-all">
+    <header className="sticky top-0 z-40 w-full backdrop-blur-xl bg-card-custom/85 border-b border-main shadow-xs transition-all">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
 
         {/* Brand Logo */}
@@ -34,7 +35,7 @@ export default function Navbar({ loadSample }) {
           <div className="flex flex-col">
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-extrabold text-main tracking-tight font-display-custom">JWT Console</span>
-              <span className="cyber-badge text-primary-color bg-indigo-50 border-indigo-200">v2.0</span>
+              <span className="cyber-badge text-primary-color bg-secondary-custom border-main">v2.0</span>
             </div>
             <span className="text-[10px] text-muted-custom font-mono-custom hidden sm:inline">Cryptographic Security Suite</span>
           </div>
@@ -50,7 +51,7 @@ export default function Navbar({ loadSample }) {
                 onClick={() => navigate(item.path)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold tracking-wide uppercase transition-all cursor-pointer ${isActive
                     ? "badge-indigo-outline shadow-xs font-semibold"
-                    : "text-muted-custom hover:text-main hover:bg-white/60"
+                    : "text-muted-custom hover:text-main hover:bg-card-custom/60"
                   }`}
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -62,7 +63,7 @@ export default function Navbar({ loadSample }) {
           })}
         </nav>
 
-        {/* Right CTA / Sample Load */}
+        {/* Right CTA / Sample Load & Theme Toggle */}
         <div className="hidden sm:flex items-center gap-2.5">
           {loadSample && currentPath === "/decode" ? (
             <button
@@ -72,6 +73,9 @@ export default function Navbar({ loadSample }) {
               Load Sample
             </button>
           ) : null}
+
+          {/* Theme Engine Switcher */}
+          <ThemeToggle />
 
           <button
             onClick={() => navigate("/decode")}
@@ -84,25 +88,28 @@ export default function Navbar({ loadSample }) {
           </button>
         </div>
 
-        {/* Mobile Hamburger Button */}
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="lg:hidden p-2 rounded-xl border border-main bg-card-custom text-muted-custom hover:text-main cursor-pointer"
-          aria-label="Toggle Navigation Menu"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            {mobileMenuOpen ? (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            ) : (
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            )}
-          </svg>
-        </button>
+        {/* Mobile Actions (Theme Toggle + Hamburger) */}
+        <div className="flex sm:hidden items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-xl border border-main bg-card-custom text-muted-custom hover:text-main cursor-pointer"
+            aria-label="Toggle Navigation Menu"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {mobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* Mobile Dropdown Menu with Animation */}
       {mobileMenuOpen && (
-        <div className="lg:hidden border-b border-main bg-white/95 backdrop-blur-xl px-4 py-3 space-y-1.5 animate-scale-in">
+        <div className="lg:hidden border-b border-main bg-card-custom/95 backdrop-blur-xl px-4 py-3 space-y-1.5 animate-scale-in">
           {navItems.map((item) => {
             const isActive = currentPath === item.path;
             return (
@@ -114,7 +121,7 @@ export default function Navbar({ loadSample }) {
                 }}
                 className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider cursor-pointer ${isActive
                     ? "badge-indigo-outline text-primary-color"
-                    : "text-muted-custom hover:bg-slate-100 hover:text-main"
+                    : "text-muted-custom hover:bg-secondary-custom hover:text-main"
                   }`}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

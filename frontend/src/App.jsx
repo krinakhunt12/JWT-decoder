@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { ThemeProvider } from "./context/ThemeContext";
 import { JwtProvider, useJwtContext } from "./context/JwtContext";
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
@@ -57,9 +58,9 @@ function AppLayout() {
 
       {/* Ambient Cyber Background Glows */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-        <div className="absolute -top-40 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[150px] animate-float-orb-slow" />
-        <div className="absolute top-1/3 -right-40 w-[450px] h-[450px] bg-violet-600/5 rounded-full blur-[130px] animate-float-orb-fast" />
-        <div className="absolute bottom-10 left-10 w-[350px] h-[350px] bg-cyan-500/4 rounded-full blur-[120px]" />
+        <div className="absolute -top-40 left-1/4 w-[500px] h-[500px] bg-indigo-500/5 dark:bg-purple-600/12 rounded-full blur-[150px] animate-float-orb-slow" />
+        <div className="absolute top-1/3 -right-40 w-[450px] h-[450px] bg-violet-600/5 dark:bg-cyan-500/10 rounded-full blur-[130px] animate-float-orb-fast" />
+        <div className="absolute bottom-10 left-10 w-[350px] h-[350px] bg-cyan-500/4 dark:bg-purple-500/10 rounded-full blur-[120px]" />
       </div>
 
       {/* Main Dynamic View Area */}
@@ -76,9 +77,11 @@ function AppLayout() {
 export default function App() {
   return (
     <ErrorBoundary title="JWT Console Critical Exception">
-      <JwtProvider>
-        <AppLayout />
-      </JwtProvider>
+      <ThemeProvider>
+        <JwtProvider>
+          <AppLayout />
+        </JwtProvider>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 }
